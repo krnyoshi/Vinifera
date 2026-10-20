@@ -1041,7 +1041,9 @@ void BuildingClassExt::_Draw_Overlays(const Point2D& coord, const Rect& rect)
              *  If this is a factory, and the player has spied its owner, draw the cameo of what it's currently producing.
              */
             if (SpiedBy & (1 << (PlayerPtr->Class->House)) || Session.ObiWan) {
-                FactoryClass* factory = House->Is_Human_Player() ? House->Fetch_Factory(Class->ToBuild) : Factory;
+
+                BuildingTypeClassExtension* btypeext = Extension::Fetch(Class);
+                FactoryClass* factory = House->Is_Human_Player() ? Extension::Fetch(House)->Fetch_Factory(Class->ToBuild, btypeext->IsNaval ? PRODFLAG_NAVAL : PRODFLAG_NONE) : Factory;
                 if (factory != nullptr) {
                     ObjectClass* obj = factory->Get_Object();
                     if (obj != nullptr) {
@@ -1086,6 +1088,20 @@ void BuildingClassExt::_Draw_Overlays(const Point2D& coord, const Rect& rect)
 
 
 /**
+ *  Extracted logic for #issue-204 fixes for reuse.
+ *  Note that this function assumes the building is in contact with a valid aircraft.
+ *
+ *  @author: CCHyper, JoyfulShush
+ */
+int Get_Aircraft_Reload_Time(BuildingClass* building)
+{
+    AircraftClass* radio = reinterpret_cast<AircraftClass*>(building->Contact_With_Whom());
+    AircraftTypeClassExtension* radio_class_ext = Extension::Fetch(radio->Class);
+    return radio_class_ext->Get_ReloadRate() * TICKS_PER_MINUTE;
+}
+
+
+/**
  *  #issue-204
  * 
  *  Implements ReloadRate for AircraftTypes, allowing each aircraft to have
@@ -1093,13 +1109,31 @@ void BuildingClassExt::_Draw_Overlays(const Point2D& coord, const Rect& rect)
  * 
  *  @author: CCHyper
  */
-DEFINE_HOOK(0x0043266C, _BuildingClass_Mission_Repair_ReloadRate_Patch, 0)
+DEFINE_HOOK(0x0043266C, _BuildingClass_Mission_Repair_ReloadRate_Patch_Initial, 0)
+{
+    GET(BuildingClass*, this_ptr, EBP);
+           
+    int time = Get_Aircraft_Reload_Time(this_ptr);
+    R->EAX(time);
+
+    return 0x0043260F;
+}
+
+
+/**
+ *  #issue-204
+ *
+ *  Implements ReloadRate for AircraftTypes, allowing each aircraft to have
+ *  its own independent ammo reloading rate when docked with a helipad.
+ *  Fixes an issue where aircraft only did reload with their own rate when starting to regenerate ammo
+ *
+ *  @author: JoyfulShush
+ */
+DEFINE_HOOK(0x004325FE, _BuildingClass_Mission_Repair_ReloadRate_Patch_During, 0)
 {
     GET(BuildingClass*, this_ptr, EBP);
 
-    AircraftClass* radio = reinterpret_cast<AircraftClass*>(this_ptr->Contact_With_Whom());
-    AircraftTypeClassExtension* radio_class_ext = Extension::Fetch(radio->Class);
-    int time = radio_class_ext->Get_ReloadRate() * TICKS_PER_MINUTE;
+    int time = Get_Aircraft_Reload_Time(this_ptr);
     R->EAX(time);
 
     return 0x0043260F;
@@ -2432,11 +2466,9 @@ BuildingClass* Find_Best_Alternative_Factory(BuildingClass* this_ptr, FootClass*
             // if (bldg->Class != this_ptr->Class)
             //     continue;
 
-            const TechnoTypeClass* technotype = exiting_object->TClass;
-
-            // Check ownable, so only factories of a faction that owns the object can
-            // build the object
-            if ((bldg->Class->Get_Ownable() & technotype->Get_Ownable()) == 0) {
+            bool unit_is_naval = Extension::Fetch(exiting_object->TClass)->IsNaval;
+            bool building_is_naval = Extension::Fetch(bldg->TClass)->IsNaval;
+            if (unit_is_naval != building_is_naval) {
                 continue;
             }
 
@@ -2462,16 +2494,16 @@ BuildingClass* Find_Best_Alternative_Factory(BuildingClass* this_ptr, FootClass*
 /**
  *  Replaces the loop starting from 0x0042CAB9 to improve the alternative
  *  war factory selection logic when a war factory is busy in 3 ways:
- * 
+ *
  *  1) The object can now exit from factory buildings of a different type
  *     than what the object was originally produced from.
- *  
- *  2) The above takes speed type into account when finding building to exit from,
+ *
+ *  2) The above takes naval into account when finding building to exit from,
  *     preventing ships from exiting from land-based factories and vice-versa.
- * 
+ *
  *  3) The logic prefers finding the closest rather than the "first" alternative
  *  factory building.
- * 
+ *
  *  @author: Rampastring
  */
 DEFINE_HOOK(0x0042CAB9, _BuildingClass_Exit_Object_Factory_Busy_Customized_Alternate_Factory_Seeking_Logic, 0)
@@ -2763,11 +2795,11 @@ MoveType BuildingClassExt::_Can_Enter_Cell(CellClass const* cell, FacingType dir
         if (ScenarioInit) {
             return MOVE_OK;
         }
-
-        auto class_ext = Extension::Fetch(Class);
+        
         auto passability = cell->Passability;        
         
-        if (class_ext->IsNaval) {
+        // Buildings that are WaterBound=yes have the SPEED_FLOAT speed type.
+        if (Class->Speed == SPEED_FLOAT) {
             if (passability != PASSABLE_WATER || cell->Is_Bridge_Here()) {
                 return MOVE_NO;
             }
@@ -2782,6 +2814,29 @@ MoveType BuildingClassExt::_Can_Enter_Cell(CellClass const* cell, FacingType dir
 
     Cell cell_id = cell->CellID;
     return Class->Legal_Placement(cell_id, House) ? MOVE_OK : MOVE_NO;
+}
+
+
+/**
+ *  Patches BuildingClass::Unlimbo right after a building was identified as a ConYard, before being added to the ConYard list.
+ *  AI houses that build base nodes need to know the placement center of their base in order to correctly place structures around it.
+ *  In a skirmish setting, it is immediately set as the AI deploys its ConYards (in UnitClass::Try_To_Deploy).
+ *  However, in campaign, it is only set when the Auto Base Building trigger action is used, which can cause bases to get stuck
+ *  trying to build the next node at the ConYard's position, which is registered as the center. (in HouseClass::Where_To_Place_Building).
+ *  This makes sure that the AI has this value correctly set during any reason a ConYard is being unlimboed.
+ *  Note that this happens after Recalc_Center was already done as part of Unlimbo, so it is already set correctly.
+ *
+ *  @author: JoyfulShush
+ */
+DEFINE_HOOK(0x0042AA8B, _BuildingClass_Unlimbo_ConYard_PlacementCenter_Patch, 6)
+{
+    GET(BuildingClass*, this_ptr, ESI);
+
+    if (this_ptr->House->Base.PlacementCenter == CELL_NONE && !this_ptr->House->Is_Human_Player()) {
+        this_ptr->House->Base.PlacementCenter = this_ptr->House->Center.As_Cell();
+    }
+
+    return 0;
 }
 
 

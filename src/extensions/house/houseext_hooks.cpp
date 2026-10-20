@@ -130,7 +130,7 @@ int HouseClassExt::_AI_Building()
     if (node->Type == BASE_DEFENSE || BuildingTypes[node->Type] == Rule->WallTower && node->CellID == Cell(0, 0)) {
 
         const int nodeid = Base.Nodes.ID(node);
-        if (!AI_Build_Defense(nodeid, Base.field_38.Count() > 0 ? &Base.field_38 : nullptr)) {
+        if (!AI_Build_Defense(nodeid, Base.OuterCells.Count() > 0 ? &Base.OuterCells : nullptr)) {
 
             /**
              *  If it's a wall tower, delete it twice?
@@ -680,39 +680,18 @@ void HouseClassExt::_MPlayer_Defeated()
         }
     }
 
-    /**
-     *  If this is me:
-     *  - Add my defeat message
-     */
-    if (PlayerPtr == this) {
-        if (!Extension::Fetch(PlayerPtr)->IsObserver) {
+    if (!Class->IsMultiplayPassive && !Extension::Fetch(this)->IsObserver)
+    {
+        std::snprintf(txt, std::size(txt), Fetch_String(TXT_PLAYER_DEFEATED), IniName.c_str());
+        Session.Messages.Add_Message(nullptr, 0, txt, Scheme, TPF_6PT_GRAD | TPF_USE_GRAD_PAL | TPF_FULLSHADOW, Rule->MessageDelay * TICKS_PER_MINUTE);
 
-            /**
-             *  Pop up a message showing that I was defeated
-             */
-            std::snprintf(txt, std::size(txt), Fetch_String(TXT_PLAYER_DEFEATED), IniName.c_str());
-            Session.Messages.Add_Message(nullptr, 0, txt, static_cast<ColorSchemeType>(Session.ColorIdx), TPF_6PT_GRAD | TPF_USE_GRAD_PAL | TPF_FULLSHADOW, Rule->MessageDelay * TICKS_PER_MINUTE);
+        if (PlayerPtr == this) {
             Speak(VOX_YOU_HAVE_LOST);
+        } else {
+            Speak(VOX_PLAYER_DEFEATED);
         }
 
-        Map.Flag_To_Redraw();
         DEBUG_INFO("MPlayer_Defeated() - Player {} has been defeated\n", IniName);
-
-    } else {
-
-        /**
-         *  If it wasn't me, find out who was defeated
-         */
-        if (!Class->IsMultiplayPassive) {
-            if (!Extension::Fetch(PlayerPtr)->IsObserver) {
-                std::snprintf(txt, std::size(txt), Fetch_String(TXT_PLAYER_DEFEATED), IniName.c_str());
-                Session.Messages.Add_Message(nullptr, 0, txt, Scheme, TPF_6PT_GRAD | TPF_USE_GRAD_PAL | TPF_FULLSHADOW, Rule->MessageDelay * TICKS_PER_MINUTE);
-                Speak(VOX_PLAYER_DEFEATED);
-            }
-
-            Map.Flag_To_Redraw();
-            DEBUG_INFO("MPlayer_Defeated() - Opponent {} has been defeated\n", IniName);
-        }
     }
 
     /**
@@ -2101,6 +2080,35 @@ DEFINE_HOOK(0x004C9937, HouseClass_Updated_Spied_By_Sight_Range_Patch, 0)
     Map.Sight_From(coord, sight_range, this_ptr);
 
     return 0x004C996B;
+}
+
+
+/**
+ *  Prevents AITrigger team creation for human players in case
+ *  production for a Spawn house has been enabled by a trigger.
+ *  AITrigger team creation for human players causes desyncs because team recruitment
+ *  relies on the Group= setting of units, which for human players is local state.
+ *
+ *  @author: Rampastring
+ */
+DEFINE_HOOK(0x004BC9D4, _HouseClass_AI_Team_Production, 0)
+{
+    GET(HouseClass*, this_ptr, ESI);
+
+    // Preserve the native OR EBX, -1 at 0x004BC9E0. The DamageTime check
+    // at 0x004BCAA0 also uses this timer sentinel after either continuation.
+    R->EBX(0xFFFFFFFF);
+
+    if (this_ptr->Is_Human_Player()) {
+        return 0x004BCAA0;
+    }
+
+    // Stolen bytes / code.
+    if (this_ptr->TeamTime.Expired()) {
+        return 0x004BC9FD;
+    }
+
+    return 0x004BCAA0;
 }
 
 

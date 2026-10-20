@@ -53,6 +53,41 @@ This page lists the history of changes across stable Vinifera releases and also 
 
 ## Changelog
 
+### 1.0.0.2
+
+:::{dropdown} Click to show
+
+New:
+- Screenshots now display an on-screen confirmation with the saved filename, or an error message if the screenshot could not be written (by ZivDero)
+- Introduce -4 as a possible argument meaning "any human player" for the "Entered By" event (by Rampastring)
+- Add support for loading OwnerDraw (Options Menu) graphics from side-specific MIX files (by Rampastring)
+
+Fixes:
+- Fix a bug where taking a screenshot at very high resolutions (such as 8K and above) could fail with a memory allocation error, freeze the game for several seconds, or leave an empty PNG file in the Screenshots folder. The PNG is now encoded incrementally in small bands, keeping memory use constant at any resolution (by ZivDero)
+- Fix a bug where screenshots captured a wrongly offset and scaled region of the screen when the game window size did not match the render resolution, or when running in windowed mode with the window away from the top-left corner of the screen. Screenshots now always capture the full frame at the render resolution (by ZivDero)
+- Fix a bug where the EVA voiceover on the campaign mission selection screen was played through the UI audio group, so it was attenuated by the sound effect volume on top of the speech volume, and was silent entirely when the sound effect volume was zero. It now follows the speech volume only, like the rest of EVA's lines (by ZivDero)
+- Fix a bug where menu, score screen, World Domination Tour and dialog sound effects had the sound effect volume applied twice, making them quieter than in vanilla at any setting below maximum (by ZivDero)
+- Fix a bug where system feedback sounds (such as the voice volume slider feedback beep) were scaled by the sound effect volume and skipped entirely when it was zero, contrary to vanilla behavior (by ZivDero)
+- Fix a bug where positional sounds discarded the caller-supplied volume, and moving sounds would jump in volume on their first position update because the sound's own volume was not applied (by ZivDero)
+- Fix a bug where the ion storm music volume reduction could compound permanently when the ambient sound was restarted (e.g. after loading a saved game mid-storm), and was not undone if the ambient stopped on its own. Changing the music volume during a storm now also keeps the reduction applied instead of cancelling it (by ZivDero)
+- Fix a crash that occurred when the game tried to pick the next music track while no tracks were available to play, for example when the scores mix files are missing from the installation and the music volume is raised from zero in-game (by ZivDero)
+- Fix the game crashing on scenario start when a HouseType has no valid starting infantry and UnitCount is above 0 (by JoyfulShush)
+- Fix alternative war factory selection not respecting the `Naval=` key (by Rampastring)
+- Fix crash when loading a game when a game object's or animation's graphics are present in side-specific MIX file (by Rampastring)
+- Fix game exiting with a "The legacy version of HouseClass::Fetch_Factory has been called" error when a spectator selected a factory building (by Rampastring)
+- Fix a bug where an AI house could get stuck trying to build base nodes after being interrupted by a friendly immovable object (by JoyfulShush)
+- Fix a bug where a theme with `Repeat=yes` blocked the "Play Music Theme" trigger action (by ZivDero)
+- Fix a bug where music stopped for the rest of the mission once `[Basic]Theme=` had played through (by ZivDero)
+- Fix a bug where CollateralDamageCoefficient would be reset if an object's section is specified on the map file (by JoyfulShush)
+- Fix a bug where AITrigger team creation happened for human players in multiplayer if enabled through a trigger, leading to desyncs due to team recruitment depending on local unit control group state (by Rampastring)
+- Fix a bug where Carryalls became immune to weapons when sitting on the ground while holding a unit and being ignored by AI (by JoyfulShush)
+- Fix a bug where the game could go out of sync when a rocket was spawned (by Rampastring)
+- Fix a bug where rockets could be invincible to anti-air weapons (by Rampastring)
+- Fix a bug where healing units in AI teams would be preferred as team's leaders, causing attack scripts to be skipped.
+- Healing units in AI teams now assume Area Guard stance and escort team members in attack scripts.
+
+:::
+
 ### 1.0.0.1
 
 :::{dropdown} Click to show

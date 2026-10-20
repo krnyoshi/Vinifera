@@ -201,6 +201,12 @@ This page lists all the individual contributions to the project by their author.
   - Extend aircraft speed to include house Airspeed bias, game speed bias, and the FASTER veteran/elite ability when calculating aircraft speed values.
   - Add a key to allow AI-controlled units to persist their tags when they deploy into a building.
   - Improve same-type select command logic, and allow map-wide select when pressing twice in succession.
+  - Fix the game crashing on scenario start when a HouseType has no valid starting infantry and UnitCount is above 0.
+  - Fix a bug where an AI house could get stuck trying to build base nodes after being interrupted by a friendly immovable object.
+  - Fix a bug where CollateralDamageCoefficient would be reset if an object's section is specified on the map file.
+  - Fix a bug where Carryalls became immune to weapons when sitting on the ground while holding a unit and being ignored by AI.
+  - Fix a bug where healing units in AI teams would be preferred as team's leaders, causing attack scripts to be skipped.
+  - Healing units in AI teams now assume Area Guard stance and escort team members in attack scripts.
 - **Kerbiter (Metadorius)**:
   - Initial documentation setup.
 - **Krnyoshi**:
@@ -305,6 +311,14 @@ This page lists all the individual contributions to the project by their author.
   - Make it possible to play videos in multiplayer.
   - Make it possible to vote-skip videos in multiplayer.
   - Options menu is no longer opened with network input delay in multiplayer.
+  - Fix alternative war factory selection not respecting the `Naval=` key.
+  - Introduce -4 as a possible argument meaning "any human player" for the "Entered By" event.
+  - Fix crash when loading a game when a game object's or animation's graphics are present in side-specific MIX file.
+  - Add support for loading OwnerDraw (Options Menu) graphics from side-specific MIX files.
+  - Fix game exiting with a "The legacy version of HouseClass::Fetch_Factory has been called" error when a spectator selected a factory building.
+  - Fix a bug where AITrigger team creation happened for human players in multiplayer if enabled through a trigger, leading to desyncs due to team recruitment depending on local unit control group state.
+  - Fix a bug where the game could go out of sync when a rocket was spawned.
+  - Fix a bug where rockets could be invincible to anti-air weapons.
 - **secsome**:
   - Add support for up to 32767 waypoints to be used in scenarios.
 - **Starkku**:
@@ -451,3 +465,5 @@ This page lists all the individual contributions to the project by their author.
   - Reimplement the software blitters with hand-written SIMD (SSE2/AVX2) for faster rendering on modern CPUs.
   - Correct the translucent-blend rounding so layered translucency no longer darkens.
   - Add a synchronization error dialog that lets the host load a saved game, continue or quit when a multiplayer game goes out of sync, with host migration and in-dialog chat.
+  - Fix volume handling issues in the audio engine.
+  - Fix a crash that occurred when the game tried to pick the next music track while no tracks were available to play.

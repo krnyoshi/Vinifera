@@ -114,6 +114,7 @@
 #include "technoext.h"
 #include "verses.h"
 #include "scenarioext.h"
+#include "xmouse.h"
 
 #include <atlbase.h>
 #include <charconv>
@@ -798,10 +799,6 @@ bool Vinifera_Get_All(IStream *pStm, bool load_net)
     }
     SpeechEnabled = true;
 
-    Map.Flag_To_Redraw(GS_REDRAW_ALL);
-
-    //Vinifera_Remap_Extension_Pointers();
-
     /**
      *  Load the bridge health tracker map
      */
@@ -809,6 +806,17 @@ bool Vinifera_Get_All(IStream *pStm, bool load_net)
     if (FAILED(Load_Unordered_Map(pStm, BridgeHealths, "BridgeHealths"))) {
         return false;
     }
+
+    UserInputLocked = Scen->InputLock;
+    if (!MouseCursor->Is_Hidden() && Scen->InputLock) {
+        MouseCursor->Hide_Mouse();
+    } else if (MouseCursor->Is_Hidden() && !Scen->InputLock) {
+        MouseCursor->Show_Mouse();
+    }
+
+    Map.Flag_To_Redraw(GS_REDRAW_ALL);
+
+    // Vinifera_Remap_Extension_Pointers();
 
     return true;
 }
